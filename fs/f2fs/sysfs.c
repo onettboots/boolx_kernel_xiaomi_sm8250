@@ -365,13 +365,12 @@ out:
 		}
 		return count;
 	}
-	if (!strcmp(a->attr.name, "gc_idle")) {
-		if (t == GC_IDLE_CB)
-			sbi->gc_mode = GC_IDLE_CB;
-		else if (t == GC_IDLE_GREEDY)
-			sbi->gc_mode = GC_IDLE_GREEDY;
-		else
-			sbi->gc_mode = GC_NORMAL;
+
+	if (!strcmp(a->attr.name, "gc_urgent_high_remaining")) {
+		spin_lock(&sbi->gc_urgent_high_lock);
+		sbi->gc_urgent_high_remaining = t;
+		spin_unlock(&sbi->gc_urgent_high_lock);
+
 		return count;
 	}
 

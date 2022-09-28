@@ -675,7 +675,8 @@ void f2fs_decompress_pages(struct bio *bio, struct page *page, bool verity)
 
 	if (dic->clen > PAGE_SIZE * dic->nr_cpages - COMPRESS_HEADER_SIZE) {
 		ret = -EFSCORRUPTED;
-		goto out_vunmap_cbuf;
+		f2fs_handle_error(sbi, ERROR_FAIL_DECOMPRESSION);
+		goto out_release;
 	}
 
 	ret = cops->decompress_pages(dic);
@@ -805,6 +806,12 @@ static int __f2fs_cluster_blocks(struct compress_ctx *cc, bool compr)
 	if (ret) {
 		if (ret == -ENOENT)
 			ret = 0;
+		goto fail;
+	}
+
+	if (f2fs_sanity_check_cluster(&dn)) {
+		ret = -EFSCORRUPTED;
+		f2fs_handle_error(F2FS_I_SB(inode), ERROR_CORRUPTED_CLUSTER);
 		goto fail;
 	}
 

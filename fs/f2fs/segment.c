@@ -324,7 +324,6 @@ skip:
 
 void f2fs_drop_inmem_pages(struct inode *inode)
 {
-	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	struct f2fs_inode_info *fi = F2FS_I(inode);
 
 	while (!list_empty(&fi->inmem_pages)) {
@@ -334,16 +333,14 @@ void f2fs_drop_inmem_pages(struct inode *inode)
 		mutex_unlock(&fi->inmem_lock);
 	}
 
-	fi->i_gc_failures[GC_FAILURE_ATOMIC] = 0;
-
-	spin_lock(&sbi->inode_lock[ATOMIC_FILE]);
-	if (!list_empty(&fi->inmem_ilist))
-		list_del_init(&fi->inmem_ilist);
-	if (f2fs_is_atomic_file(inode)) {
-		clear_inode_flag(inode, FI_ATOMIC_FILE);
-		sbi->atomic_files--;
-	}
-	spin_unlock(&sbi->inode_lock[ATOMIC_FILE]);
+	if (clean)
+		truncate_inode_pages_final(inode->i_mapping);
+	clear_inode_flag(fi->cow_inode, FI_COW_FILE);
+	iput(fi->cow_inode);
+	fi->cow_inode = NULL;
+	release_atomic_write_cnt(inode);
+	clear_inode_flag(inode, FI_ATOMIC_FILE);
+	stat_dec_atomic_inode(inode);
 }
 
 void f2fs_drop_inmem_page(struct inode *inode, struct page *page)

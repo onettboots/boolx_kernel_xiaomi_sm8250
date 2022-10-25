@@ -122,6 +122,12 @@ static ssize_t pending_discard_show(struct f2fs_attr *a,
 				&SM_I(sbi)->dcc_info->discard_cmd_cnt));
 }
 
+static ssize_t gc_mode_show(struct f2fs_attr *a,
+		struct f2fs_sb_info *sbi, char *buf)
+{
+	return sprintf(buf, "%s\n", gc_mode_names[sbi->gc_mode]);
+}
+
 static ssize_t features_show(struct f2fs_attr *a,
 		struct f2fs_sb_info *sbi, char *buf)
 {
@@ -277,6 +283,65 @@ static ssize_t f2fs_sbi_show(struct f2fs_attr *a,
 								extlist[i]);
 		return len;
 	}
+
+	if (!strcmp(a->attr.name, "ckpt_thread_ioprio")) {
+		struct ckpt_req_control *cprc = &sbi->cprc_info;
+		int len = 0;
+		int class = IOPRIO_PRIO_CLASS(cprc->ckpt_thread_ioprio);
+		int data = IOPRIO_PRIO_DATA(cprc->ckpt_thread_ioprio);
+
+		if (class == IOPRIO_CLASS_RT)
+			len += scnprintf(buf + len, PAGE_SIZE - len, "rt,");
+		else if (class == IOPRIO_CLASS_BE)
+			len += scnprintf(buf + len, PAGE_SIZE - len, "be,");
+		else
+			return -EINVAL;
+
+		len += scnprintf(buf + len, PAGE_SIZE - len, "%d\n", data);
+		return len;
+	}
+
+#ifdef CONFIG_F2FS_FS_COMPRESSION
+	if (!strcmp(a->attr.name, "compr_written_block"))
+		return snprintf(buf, PAGE_SIZE, "%llu\n",
+						sbi->compr_written_block);
+
+	if (!strcmp(a->attr.name, "compr_saved_block"))
+		return snprintf(buf, PAGE_SIZE, "%llu\n",
+						sbi->compr_saved_block);
+
+	if (!strcmp(a->attr.name, "compr_new_inode"))
+		return snprintf(buf, PAGE_SIZE, "%u\n",
+						sbi->compr_new_inode);
+#endif
+
+	if (!strcmp(a->attr.name, "gc_urgent"))
+		return snprintf(buf, PAGE_SIZE, "%s\n",
+				gc_mode_names[sbi->gc_mode]);
+
+	if (!strcmp(a->attr.name, "gc_reclaimed_segments")) {
+		return snprintf(buf, PAGE_SIZE, "%u\n",
+			sbi->gc_reclaimed_segs[sbi->gc_segment_mode]);
+	}
+
+	if (!strcmp(a->attr.name, "current_atomic_write")) {
+		s64 current_write = atomic64_read(&sbi->current_atomic_write);
+
+		return snprintf(buf, PAGE_SIZE, "%lld\n",
+			current_write);
+	}
+
+	if (!strcmp(a->attr.name, "peak_atomic_write"))
+		return snprintf(buf, PAGE_SIZE, "%lld\n",
+			sbi->peak_atomic_write);
+
+	if (!strcmp(a->attr.name, "committed_atomic_block"))
+		return snprintf(buf, PAGE_SIZE, "%llu\n",
+			sbi->committed_atomic_block);
+
+	if (!strcmp(a->attr.name, "revoked_atomic_block"))
+		return snprintf(buf, PAGE_SIZE, "%llu\n",
+			sbi->revoked_atomic_block);
 
 	ui = (unsigned int *)(ptr + a->offset);
 
@@ -596,6 +661,9 @@ F2FS_GENERAL_RO_ATTR(current_reserved_blocks);
 F2FS_GENERAL_RO_ATTR(unusable);
 F2FS_GENERAL_RO_ATTR(encoding);
 F2FS_GENERAL_RO_ATTR(mounted_time_sec);
+F2FS_GENERAL_RO_ATTR(main_blkaddr);
+F2FS_GENERAL_RO_ATTR(pending_discard);
+F2FS_GENERAL_RO_ATTR(gc_mode);
 #ifdef CONFIG_F2FS_STAT_FS
 F2FS_STAT_ATTR(STAT_INFO, f2fs_stat_info, cp_foreground_calls, cp_count);
 F2FS_STAT_ATTR(STAT_INFO, f2fs_stat_info, cp_background_calls, bg_cp_count);
@@ -647,6 +715,7 @@ static struct attribute *f2fs_attrs[] = {
 	ATTR_LIST(discard_granularity),
 	ATTR_LIST(max_ordered_discard),
 	ATTR_LIST(pending_discard),
+	ATTR_LIST(gc_mode),
 	ATTR_LIST(ipu_policy),
 	ATTR_LIST(min_ipu_util),
 	ATTR_LIST(min_fsync_blocks),

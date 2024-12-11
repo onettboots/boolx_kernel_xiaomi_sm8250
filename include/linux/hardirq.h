@@ -20,8 +20,8 @@ static inline void __rcu_irq_enter_check_tick(void) { }
 
 static __always_inline void rcu_irq_enter_check_tick(void)
 {
-	if (context_tracking_enabled())
-		__rcu_irq_enter_check_tick();
+        if (context_tracking_is_enabled())
+                __rcu_irq_enter_check_tick();
 }
 
 /*

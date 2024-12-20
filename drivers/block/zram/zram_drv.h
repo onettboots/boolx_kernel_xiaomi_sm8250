@@ -18,10 +18,8 @@
 #include <linux/rwsem.h>
 #include <linux/zsmalloc.h>
 #include <linux/crypto.h>
-#include <linux/spinlock.h>
 
 #include "zcomp.h"
-#include "zram_dedup.h"
 
 #define SECTORS_PER_PAGE_SHIFT	(PAGE_SHIFT - SECTOR_SHIFT)
 #define SECTORS_PER_PAGE	(1 << SECTORS_PER_PAGE_SHIFT)
@@ -32,16 +30,15 @@
 
 
 /*
- * The lower ZRAM_FLAG_SHIFT bits of table.flags is for
- * object size (excluding header), the higher bits is for
- * zram_pageflags.
+ * ZRAM is mainly used for memory efficiency so we want to keep memory
+ * footprint small and thus squeeze size and zram pageflags into a flags
+ * member. The lower ZRAM_FLAG_SHIFT bits is for object size (excluding
+ * header), which cannot be larger than PAGE_SIZE (requiring PAGE_SHIFT
+ * bits), the higher bits are for zram_pageflags.
  *
- * zram is mainly used for memory efficiency so we want to keep memory
- * footprint small so we can squeeze size and flags into a field.
- * The lower ZRAM_FLAG_SHIFT bits is for object size (excluding header),
- * the higher bits is for zram_pageflags.
+ * We use BUILD_BUG_ON() to make sure that zram pageflags don't overflow.
  */
-#define ZRAM_FLAG_SHIFT 24
+#define ZRAM_FLAG_SHIFT (PAGE_SHIFT + 1)
 
 /* Flags for zram pages (table[page_no].flags) */
 enum zram_pageflags {
@@ -57,28 +54,20 @@ enum zram_pageflags {
 
 /*-- Data structures */
 
-struct zram_entry {
-	struct rb_node rb_node;
-	u32 len;
-	u32 checksum;
-	unsigned long refcount;
-	unsigned long handle;
-};
-
 /* Allocated for each disk page */
 struct zram_table_entry {
 	union {
-		struct zram_entry *entry;
+		unsigned long handle;
 		unsigned long element;
 	};
 	unsigned long flags;
+#ifdef CONFIG_ZRAM_MEMORY_TRACKING
 	ktime_t ac_time;
+#endif
 };
 
 struct zram_stats {
 	atomic64_t compr_data_size;	/* compressed size of pages stored */
-	atomic64_t num_reads;	/* failed + successful */
-	atomic64_t num_writes;	/* --do-- */
 	atomic64_t failed_reads;	/* can happen when memory is too low */
 	atomic64_t failed_writes;	/* can happen when memory is too low */
 	atomic64_t invalid_io;	/* non-page-aligned I/O requests */
@@ -93,16 +82,6 @@ struct zram_stats {
 	atomic64_t bd_reads;		/* no. of reads from backing device */
 	atomic64_t bd_writes;		/* no. of writes from backing device */
 #endif
-	atomic64_t dup_data_size;	/*
-					 * compressed size of pages
-					 * duplicated
-					 */
-	atomic64_t meta_data_size;	/* size of zram_entries */
-};
-
-struct zram_hash {
-	spinlock_t lock;
-	struct rb_root rb_root;
 };
 
 struct zram {
@@ -110,8 +89,6 @@ struct zram {
 	struct zs_pool *mem_pool;
 	struct zcomp *comp;
 	struct gendisk *disk;
-	struct zram_hash *hash;
-	size_t hash_size;
 	/* Prevent concurrent execution of device init */
 	struct rw_semaphore init_lock;
 	/*
@@ -131,7 +108,7 @@ struct zram {
 	 */
 	bool claim; /* Protected by bdev->bd_mutex */
 #ifdef CONFIG_ZRAM_WRITEBACK
-	struct file *backing_dev;
+        struct file *backing_dev;
 	spinlock_t wb_limit_lock;
 	bool wb_limit_enable;
 	u64 bd_wb_limit;
@@ -143,15 +120,4 @@ struct zram {
 	struct dentry *debugfs_dir;
 #endif
 };
-
-static inline bool zram_dedup_enabled(struct zram *zram)
-{
-#ifdef CONFIG_ZRAM_DEDUP
-	return zram->use_dedup;
-#else
-	return false;
-#endif
-}
-
-void zram_entry_free(struct zram *zram, struct zram_entry *entry);
 #endif

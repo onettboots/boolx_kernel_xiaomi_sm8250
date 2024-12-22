@@ -273,9 +273,6 @@ static void scan_and_kill(void)
 			set_task_rt_prio(t, 1);
 		rcu_read_unlock();
 
-		/* Elevate the victim to SCHED_RR with zero RT priority */
-		sched_setscheduler_nocheck(vtsk, SCHED_RR, &sched_zero_prio);
-
 		/* Allow the victim to run on any CPU. This won't schedule. */
 		set_cpus_allowed_ptr(vtsk, cpu_all_mask);
 

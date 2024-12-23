@@ -252,12 +252,8 @@ static void update_debug_pc_event(enum debug_event event, uint32_t arg1,
 	static DEFINE_SPINLOCK(debug_lock);
 	static int pc_event_index;
 
-	if (!lpm_debug)
-		return;
-
 	spin_lock(&debug_lock);
 	idx = pc_event_index++;
-	dbg = &lpm_debug[idx & (num_dbg_elements - 1)];
 
 	dbg->evt = event;
 	dbg->time = arch_counter_get_cntvct();

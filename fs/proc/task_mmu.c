@@ -25,6 +25,7 @@
 #include <asm/elf.h>
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
+#include <misc/lyb_taskmmu.h>
 #include "internal.h"
 
 #define SEQ_PUT_DEC(str, val) \

@@ -1531,10 +1531,6 @@ struct task_struct {
 #endif
 	ANDROID_KABI_RESERVE(8);
 
-
-#if defined(CONFIG_KSU_SUSFS) && !defined(ANDROID_KABI_RESERVE)
-	u64 android_kabi_reserved8;
-#endif
 #ifdef CONFIG_ANDROID_SIMPLE_LMK
 	struct task_struct		*simple_lmk_next;
 #endif
